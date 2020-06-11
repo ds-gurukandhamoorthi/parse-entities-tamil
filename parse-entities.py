@@ -31,13 +31,20 @@ ph_entity = ph_vowel | ph_optionally_marked_consonant
 ph_entities = OneOrMore(ph_entity)
 
 def unigram_auto(word, rules):
-    ents = entities.parseString(word)
+    ents = entities.parseString(word, parseAll=True)
     res = []
     for e in ents:
         if e not in rules:
             return None
         res += [rules[e]]
     return ''.join(res)
+
+def nb_tamil_entities(word):
+    try:
+        ents = entities.parseString(word, parseAll=True)
+        return len(ents)
+    except:
+        return 0 #we want to avoid erroneously encoded words
 
 
 
@@ -62,22 +69,24 @@ if __name__ == "__main__":
     for transfrm in open(filename, 'r'):
         frm, to = transfrm.rstrip().split('->')
         # print(frm, to)
-        f_ents = entities.parseString(frm)
-        t_ents = ph_entities.parseString(to)
-        f_len, t_len = len(f_ents), len(t_ents)
+        try:
+            f_ents = entities.parseString(frm, parseAll=True)
+            t_ents = ph_entities.parseString(to, parseAll=True)
+            f_len, t_len = len(f_ents), len(t_ents)
 
-        if f_len != t_len:
-            print(frm, to)
-            print(entities.parseString(frm))
-            print(ph_entities.parseString(to))
-            print(f_len, "--", t_len)
-        else:
-
-            for uni, ph  in zip(f_ents, t_ents):
-                count_unic_ents[uni] += 1
-                count_phon_ents[ph] += 1
-                uni2phon[uni][ph] += 1
-                phon2uni[ph][uni] += 1
+            if f_len != t_len:
+                print(frm, to)
+                print(entities.parseString(frm, parseAll = True))
+                print(ph_entities.parseString(to, parseAll = True))
+                print(f_len, "--", t_len)
+            else:
+                for uni, ph  in zip(f_ents, t_ents):
+                    count_unic_ents[uni] += 1
+                    count_phon_ents[ph] += 1
+                    uni2phon[uni][ph] += 1
+                    phon2uni[ph][uni] += 1
+        except:
+            pass #avoid words with erroneous encodings
 
     for x in count_unic_ents.most_common(20):
         print(x)
@@ -99,11 +108,11 @@ if __name__ == "__main__":
 
     print(unigram_auto("வயல்", auto_transf))
     print(unigram_auto("விறல் ", auto_transf))
-    print(unigram_auto("விறல் -வயல்", auto_transf))
+    # print(unigram_auto("விறல் -வயல்", auto_transf))
 
-    for word in open('/home/guru/tamil-words/tamil_words_without_hyphen', 'r'):
-        transformed = unigram_auto(word.rstrip(), auto_transf)
-        if transformed:
-            print("%s->%s" % (word.rstrip(), transformed))
+    # for word in open('/home/guru/tamil-words/tamil_words_without_hyphen', 'r'):
+    #     transformed = unigram_auto(word.rstrip(), auto_transf)
+    #     if transformed:
+    #         print("%s->%s" % (word.rstrip(), transformed))
 
     # print(ph_entities.parseString("gurukandhamoorthi"))
