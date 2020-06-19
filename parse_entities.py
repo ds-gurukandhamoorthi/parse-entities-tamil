@@ -1,10 +1,12 @@
 import sys
 from collections import Counter, defaultdict
+import re
 import pprint
 from pyparsing import *
 
 vowel = Char("அஆஇஈஉஊஎஏஐஒஓஔஃ")
-consonant = Literal("ஸ்ர") | Literal("க்ஷ") | Char("கசடதபறயரலவழளஞஙனநமணஸஷஹஜ")
+consonant = Literal("க்ஷ") | Char("கசடதபறயரலவழளஞஙனநமணஸஷஹஜ")
+sri =  Literal("ஸ்ரீ")
 
 #This following is written as multiline string to not to appease vim.
 mark = Char("""
@@ -14,7 +16,7 @@ mark = Char("""
 
 optionally_marked_consonant = Combine(consonant + Optional(mark))
 
-entity = vowel | optionally_marked_consonant
+entity = sri | vowel | optionally_marked_consonant
 entities = OneOrMore(entity)
 
 #phonetic
@@ -23,7 +25,7 @@ ph_nedil = Char("AEIOU") | Combine(ph_kuril * (1, 2))
 
 ph_vowel = ph_nedil | ph_kuril #in this order to avoid 'oo' parsed as 'o' 'o'
 
-ph_consonant = Literal("sh") | Literal("dh") | Literal("th") | Literal("ch") | Literal("zh") | Char("bcdfghjklmnpqrstvwxyzLN")
+ph_consonant = Literal("jh") | Literal("tr") | Literal("dr") | Literal("sh") | Literal("dh") | Literal("th") | Literal("ch") | Literal("zh") | Char("bcdfghjklmnpqrstvwxyzLN")
 
 ph_optionally_marked_consonant = Combine(ph_consonant + Optional(ph_vowel))
 
@@ -45,6 +47,11 @@ def nb_tamil_entities(word):
         return len(ents)
     except:
         return 0 #we want to avoid erroneously encoded words
+
+STRESSED_CONSONANT = "([கசடதபறயரலவழளஞஙனநமணஸஷஹஜ])[்]\\1"
+
+def nb_stressed_consonants(word):
+    return len(re.findall(STRESSED_CONSONANT, word))
 
 
 
@@ -73,12 +80,16 @@ if __name__ == "__main__":
             f_ents = entities.parseString(frm, parseAll=True)
             t_ents = ph_entities.parseString(to, parseAll=True)
             f_len, t_len = len(f_ents), len(t_ents)
+            nb_strssed = nb_stressed_consonants(frm)
 
             if f_len != t_len:
-                print(frm, to)
-                print(entities.parseString(frm, parseAll = True))
-                print(ph_entities.parseString(to, parseAll = True))
-                print(f_len, "--", t_len)
+                if nb_stressed_consonants(frm) == 0: #we would deal with stressed consonants later.
+                    njh, ndh, ngh = "ஞ்", "ந்", "ங்"
+                    if not (njh in frm or ndh in frm or ngh in frm):
+                        print(frm, to)
+                        print(entities.parseString(frm, parseAll = True))
+                        print(ph_entities.parseString(to, parseAll = True))
+                        print(f_len, "--", t_len)
             else:
                 for uni, ph  in zip(f_ents, t_ents):
                     count_unic_ents[uni] += 1
@@ -101,7 +112,8 @@ if __name__ == "__main__":
             for ph, cnt in uni2phon[u].most_common(1):
                 auto_transf[(u, ph)] += cnt
     # pprint.pprint(auto_transf.most_common())
-    auto_transf = auto_transf.most_common(17)
+    # auto_transf = auto_transf.most_common(17)
+    auto_transf = auto_transf.most_common() #we don't want to focus on words that could be transcoded even approximatively (incorrectly). The disambiguation process can be done using bigrams later... 'kai' at start becomes kai, 'kai' at end becomes gai sometimes as in mutrugai
     auto_transf = [x for x,_ in auto_transf]
     auto_transf = {u: ph for (u, ph) in auto_transf}
     print(auto_transf)
@@ -110,9 +122,10 @@ if __name__ == "__main__":
     print(unigram_auto("விறல் ", auto_transf))
     # print(unigram_auto("விறல் -வயல்", auto_transf))
 
-    # for word in open('/home/guru/tamil-words/tamil_words_without_hyphen', 'r'):
-    #     transformed = unigram_auto(word.rstrip(), auto_transf)
-    #     if transformed:
-    #         print("%s->%s" % (word.rstrip(), transformed))
+    for word in open('/tmp/important5000', 'r'):
+        transformed = unigram_auto(word.rstrip(), auto_transf)
+        if not transformed:
+            print(word.rstrip())
+            # print("%s->%s" % (word.rstrip(), transformed))
 
     # print(ph_entities.parseString("gurukandhamoorthi"))
