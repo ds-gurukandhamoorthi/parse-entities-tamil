@@ -3,6 +3,7 @@ from collections import Counter, defaultdict
 import re
 import pprint
 from pyparsing import *
+from tamilcharutils import unigram_auto
 
 vowel = Char("அஆஇஈஉஊஎஏஐஒஓஔஃ")
 consonant = Literal("க்ஷ") | Char("கசடதபறயரலவழளஞஙனநமணஸஷஹஜ")
@@ -32,7 +33,7 @@ ph_optionally_marked_consonant = Combine(ph_consonant + Optional(ph_vowel))
 ph_entity = ph_vowel | ph_optionally_marked_consonant
 ph_entities = OneOrMore(ph_entity)
 
-def unigram_auto(word, rules):
+def unigram_auto_deprecated(word, rules):
     ents = entities.parseString(word, parseAll=True)
     res = []
     for e in ents:
@@ -52,6 +53,22 @@ STRESSED_CONSONANT = "([கசடதபறயரலவழளஞஙனநமண�
 
 def nb_stressed_consonants(word):
     return len(re.findall(STRESSED_CONSONANT, word))
+
+def parse_stressed_entities(word):
+    ents = entities.parseString(word)
+    res = []
+    skip_one = False
+    for (e, nxt) in zip(ents, ents[1:]+["_"]):
+        if skip_one:
+            skip_one = False
+            continue
+        if re.search(STRESSED_CONSONANT, e + nxt):
+            res.append((e,nxt))
+            skip_one = True
+        else:
+            res.append(e)
+            skip_one = False
+    return res
 
 
 
@@ -73,6 +90,11 @@ if __name__ == "__main__":
     count_unic_ents = Counter()
     count_phon_ents = Counter()
 
+    stressed_uni2phon = defaultdict(Counter)
+    stressed_phon2uni = defaultdict(Counter)
+    stressed_count_unic_ents = Counter()
+    stressed_count_phon_ents = Counter()
+
     for transfrm in open(filename, 'r'):
         frm, to = transfrm.rstrip().split('->')
         # print(frm, to)
@@ -83,13 +105,24 @@ if __name__ == "__main__":
             nb_strssed = nb_stressed_consonants(frm)
 
             if f_len != t_len:
-                if nb_stressed_consonants(frm) == 0: #we would deal with stressed consonants later.
-                    njh, ndh, ngh = "ஞ்", "ந்", "ங்"
-                    if not (njh in frm or ndh in frm or ngh in frm):
+                f_ents_stressed = parse_stressed_entities(frm)
+                f_ents_stressed_len = len(f_ents_stressed)
+                if f_ents_stressed_len != t_len:
+                # if nb_stressed_consonants(frm) == 0: #we would deal with stressed consonants later.
+                #     njh, ndh, ngh = "ஞ்", "ந்", "ங்"
+                #     if not (njh in frm or ndh in frm or ngh in frm):
                         print(frm, to)
+                        print(f_ents_stressed)
+                        print(f_ents_stressed_len)
                         print(entities.parseString(frm, parseAll = True))
                         print(ph_entities.parseString(to, parseAll = True))
                         print(f_len, "--", t_len)
+                else:
+                    for uni, ph  in zip(f_ents_stressed, t_ents):
+                        stressed_count_unic_ents[uni] += 1
+                        stressed_count_phon_ents[ph] += 1
+                        stressed_uni2phon[uni][ph] += 1
+                        stressed_phon2uni[ph][uni] += 1
             else:
                 for uni, ph  in zip(f_ents, t_ents):
                     count_unic_ents[uni] += 1
@@ -121,6 +154,9 @@ if __name__ == "__main__":
     print(unigram_auto("வயல்", auto_transf))
     print(unigram_auto("விறல் ", auto_transf))
     # print(unigram_auto("விறல் -வயல்", auto_transf))
+
+    pprint.pprint(stressed_uni2phon)
+    pprint.pprint(stressed_phon2uni)
 
     for word in open('/tmp/important5000', 'r'):
         transformed = unigram_auto(word.rstrip(), auto_transf)
